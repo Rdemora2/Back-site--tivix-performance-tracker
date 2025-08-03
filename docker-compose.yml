@@ -1,0 +1,39 @@
+services:
+  api-performancetracker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: api-performancetracker-tivix:latest
+    container_name: api-performancetracker-tivix
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    networks:
+      - internal-services
+    expose:
+      - "8080"
+
+  nginx-api-performancetracker:
+    image: nginx:1.27-alpine
+    container_name: nginx-api-performancetracker-tivix
+    restart: unless-stopped
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - web
+      - internal-services
+    depends_on:
+      - api-performancetracker
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api-performancetracker.rule=Host(`api.performancetracker.tivix.com.br`)"
+      - "traefik.http.routers.api-performancetracker.entrypoints=websecure"
+      - "traefik.http.routers.api-performancetracker.tls.certresolver=myresolver"
+      - "traefik.http.services.api-performancetracker.loadbalancer.server.port=80"
+      - "traefik.docker.network=web"
+
+networks:
+  web:
+    external: true
+  internal-services:
+    external: true
