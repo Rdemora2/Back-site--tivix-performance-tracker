@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -39,16 +40,35 @@ func main() {
 		},
 	})
 
-	// Configurar CORS com variável de ambiente
+	// Configurar CORS com variáveis de ambiente
 	corsOrigin := os.Getenv("CORS_ORIGIN")
 	if corsOrigin == "" {
 		corsOrigin = "http://localhost:5173"
 	}
 
+	// Lista de origens permitidas (incluindo desenvolvimento e produção)
+	allowedOrigins := []string{
+		corsOrigin,
+		"http://localhost:3000",
+		"http://localhost:5173",
+		"http://127.0.0.1:5173",
+		"https://performancetracker.tivix.com.br",
+	}
+
+	// Remover duplicatas e vazios
+	var finalOrigins []string
+	seen := make(map[string]bool)
+	for _, origin := range allowedOrigins {
+		if origin != "" && !seen[origin] {
+			finalOrigins = append(finalOrigins, origin)
+			seen[origin] = true
+		}
+	}
+
 	// Middleware
 	app.Use(logger.New())
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     corsOrigin + ",http://localhost:3000,http://127.0.0.1:5173",
+		AllowOrigins:     strings.Join(finalOrigins, ","),
 		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
 		AllowHeaders:     "Origin,Content-Type,Accept,Authorization",
 		AllowCredentials: true,
