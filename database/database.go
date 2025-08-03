@@ -1,15 +1,16 @@
 package database
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 
-	_ "github.com/lib/pq"
 	"tivix-performance-tracker-backend/config"
+
+	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq"
 )
 
-var DB *sql.DB
+var DB *sqlx.DB
 
 func Connect() {
 	cfg := config.LoadConfig()
@@ -18,7 +19,7 @@ func Connect() {
 		cfg.DBHost, cfg.DBPort, cfg.DBUser, cfg.DBPassword, cfg.DBName, cfg.DBSSLMode)
 
 	var err error
-	DB, err = sql.Open("postgres", dsn)
+	DB, err = sqlx.Open("postgres", dsn)
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
@@ -33,8 +34,19 @@ func Connect() {
 func Migrate() {
 	createTablesQueries := []string{
 		`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`,
-		
-		// Tabela de times
+
+		`CREATE TABLE IF NOT EXISTS users (
+			id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+			email VARCHAR(255) NOT NULL UNIQUE,
+			password VARCHAR(255) NOT NULL,
+			name VARCHAR(255) NOT NULL,
+			role VARCHAR(50) NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'manager', 'user')),
+			needs_password_change BOOLEAN NOT NULL DEFAULT false,
+			is_active BOOLEAN NOT NULL DEFAULT true,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		);`,
+
 		`CREATE TABLE IF NOT EXISTS teams (
 			id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
 			name VARCHAR(255) NOT NULL,
@@ -44,7 +56,6 @@ func Migrate() {
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		);`,
 
-		// Tabela de desenvolvedores
 		`CREATE TABLE IF NOT EXISTS developers (
 			id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
 			name VARCHAR(255) NOT NULL,
@@ -56,7 +67,6 @@ func Migrate() {
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		);`,
 
-		// Tabela de relatórios de performance
 		`CREATE TABLE IF NOT EXISTS performance_reports (
 			id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
 			developer_id UUID NOT NULL REFERENCES developers(id) ON DELETE CASCADE,
@@ -70,14 +80,15 @@ func Migrate() {
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		);`,
 
-		// Índices para performance
+		`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);`,
+		`CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);`,
+		`CREATE INDEX IF NOT EXISTS idx_users_is_active ON users(is_active);`,
 		`CREATE INDEX IF NOT EXISTS idx_developers_team_id ON developers(team_id);`,
 		`CREATE INDEX IF NOT EXISTS idx_developers_archived_at ON developers(archived_at);`,
 		`CREATE INDEX IF NOT EXISTS idx_performance_reports_developer_id ON performance_reports(developer_id);`,
 		`CREATE INDEX IF NOT EXISTS idx_performance_reports_month ON performance_reports(month);`,
 		`CREATE INDEX IF NOT EXISTS idx_performance_reports_developer_month ON performance_reports(developer_id, month);`,
 
-		// Função para atualizar updated_at automaticamente
 		`CREATE OR REPLACE FUNCTION update_updated_at_column()
 		RETURNS TRIGGER AS $$
 		BEGIN
@@ -86,7 +97,12 @@ func Migrate() {
 		END;
 		$$ language 'plpgsql';`,
 
-		// Triggers para atualizar updated_at
+		`DROP TRIGGER IF EXISTS update_users_updated_at ON users;
+		CREATE TRIGGER update_users_updated_at
+			BEFORE UPDATE ON users
+			FOR EACH ROW
+			EXECUTE FUNCTION update_updated_at_column();`,
+
 		`DROP TRIGGER IF EXISTS update_teams_updated_at ON teams;
 		CREATE TRIGGER update_teams_updated_at
 			BEFORE UPDATE ON teams

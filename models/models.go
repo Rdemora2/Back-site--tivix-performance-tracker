@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 )
 
-// JSONB é um tipo customizado para lidar com campos JSONB do PostgreSQL
 type JSONB map[string]interface{}
 
 func (j JSONB) Value() (driver.Value, error) {
@@ -32,17 +32,15 @@ func (j *JSONB) Scan(value interface{}) error {
 	}
 }
 
-// Team representa um time/equipe
 type Team struct {
-	ID          uuid.UUID  `json:"id" db:"id"`
-	Name        string     `json:"name" db:"name"`
-	Description string     `json:"description" db:"description"`
-	Color       string     `json:"color" db:"color"`
-	CreatedAt   time.Time  `json:"createdAt" db:"created_at"`
-	UpdatedAt   time.Time  `json:"updatedAt" db:"updated_at"`
+	ID          uuid.UUID `json:"id" db:"id"`
+	Name        string    `json:"name" db:"name"`
+	Description string    `json:"description" db:"description"`
+	Color       string    `json:"color" db:"color"`
+	CreatedAt   time.Time `json:"createdAt" db:"created_at"`
+	UpdatedAt   time.Time `json:"updatedAt" db:"updated_at"`
 }
 
-// Developer representa um desenvolvedor
 type Developer struct {
 	ID                     uuid.UUID  `json:"id" db:"id"`
 	Name                   string     `json:"name" db:"name"`
@@ -54,50 +52,44 @@ type Developer struct {
 	UpdatedAt              time.Time  `json:"updatedAt" db:"updated_at"`
 }
 
-// PerformanceReport representa um relatório de performance
 type PerformanceReport struct {
-	ID                    uuid.UUID `json:"id" db:"id"`
-	DeveloperID           uuid.UUID `json:"developerId" db:"developer_id"`
-	Month                 string    `json:"month" db:"month"`
-	QuestionScores        JSONB     `json:"questionScores" db:"question_scores"`
-	CategoryScores        JSONB     `json:"categoryScores" db:"category_scores"`
-	WeightedAverageScore  float64   `json:"weightedAverageScore" db:"weighted_average_score"`
-	Highlights            string    `json:"highlights" db:"highlights"`
-	PointsToDevelop       string    `json:"pointsToDevelop" db:"points_to_develop"`
-	CreatedAt             time.Time `json:"createdAt" db:"created_at"`
-	UpdatedAt             time.Time `json:"updatedAt" db:"updated_at"`
+	ID                   uuid.UUID `json:"id" db:"id"`
+	DeveloperID          uuid.UUID `json:"developerId" db:"developer_id"`
+	Month                string    `json:"month" db:"month"`
+	QuestionScores       JSONB     `json:"questionScores" db:"question_scores"`
+	CategoryScores       JSONB     `json:"categoryScores" db:"category_scores"`
+	WeightedAverageScore float64   `json:"weightedAverageScore" db:"weighted_average_score"`
+	Highlights           string    `json:"highlights" db:"highlights"`
+	PointsToDevelop      string    `json:"pointsToDevelop" db:"points_to_develop"`
+	CreatedAt            time.Time `json:"createdAt" db:"created_at"`
+	UpdatedAt            time.Time `json:"updatedAt" db:"updated_at"`
 }
 
-// CreateTeamRequest representa a requisição para criar um time
 type CreateTeamRequest struct {
 	Name        string `json:"name" validate:"required,min=2"`
 	Description string `json:"description"`
 	Color       string `json:"color"`
 }
 
-// UpdateTeamRequest representa a requisição para atualizar um time
 type UpdateTeamRequest struct {
 	Name        *string `json:"name,omitempty"`
 	Description *string `json:"description,omitempty"`
 	Color       *string `json:"color,omitempty"`
 }
 
-// CreateDeveloperRequest representa a requisição para criar um desenvolvedor
 type CreateDeveloperRequest struct {
 	Name   string     `json:"name" validate:"required,min=2"`
 	Role   string     `json:"role" validate:"required,min=2"`
 	TeamID *uuid.UUID `json:"teamId,omitempty"`
 }
 
-// UpdateDeveloperRequest representa a requisição para atualizar um desenvolvedor
 type UpdateDeveloperRequest struct {
-	Name                   *string     `json:"name,omitempty"`
-	Role                   *string     `json:"role,omitempty"`
-	LatestPerformanceScore *float64    `json:"latestPerformanceScore,omitempty"`
-	TeamID                 *uuid.UUID  `json:"teamId,omitempty"`
+	Name                   *string    `json:"name,omitempty"`
+	Role                   *string    `json:"role,omitempty"`
+	LatestPerformanceScore *float64   `json:"latestPerformanceScore,omitempty"`
+	TeamID                 *uuid.UUID `json:"teamId,omitempty"`
 }
 
-// CreatePerformanceReportRequest representa a requisição para criar um relatório de performance
 type CreatePerformanceReportRequest struct {
 	DeveloperID          uuid.UUID `json:"developerId" validate:"required"`
 	Month                string    `json:"month" validate:"required"`
@@ -108,7 +100,72 @@ type CreatePerformanceReportRequest struct {
 	PointsToDevelop      string    `json:"pointsToDevelop"`
 }
 
-// ArchiveDeveloperRequest representa a requisição para arquivar um desenvolvedor
 type ArchiveDeveloperRequest struct {
 	Archive bool `json:"archive"`
+}
+
+type User struct {
+	ID                  uuid.UUID `json:"id" db:"id"`
+	Email               string    `json:"email" db:"email"`
+	Password            string    `json:"-" db:"password"` // O "-" faz com que este campo não seja serializado no JSON
+	Name                string    `json:"name" db:"name"`
+	Role                string    `json:"role" db:"role"` // admin, manager, user
+	NeedsPasswordChange bool      `json:"needsPasswordChange" db:"needs_password_change"`
+	IsActive            bool      `json:"isActive" db:"is_active"`
+	CreatedAt           time.Time `json:"createdAt" db:"created_at"`
+	UpdatedAt           time.Time `json:"updatedAt" db:"updated_at"`
+}
+
+func (u *User) HashPassword(password string) error {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	u.Password = string(hashedPassword)
+	return nil
+}
+
+func (u *User) CheckPassword(password string) error {
+	return bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password))
+}
+
+type RegisterRequest struct {
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required,min=6"`
+	Name     string `json:"name" validate:"required,min=2"`
+	Role     string `json:"role" validate:"omitempty,oneof=admin manager user"`
+}
+
+type LoginRequest struct {
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required"`
+}
+
+type LoginResponse struct {
+	Token string `json:"token"`
+	User  User   `json:"user"`
+}
+
+type JWTClaims struct {
+	UserID              uuid.UUID `json:"userId"`
+	Email               string    `json:"email"`
+	Role                string    `json:"role"`
+	IsActive            bool      `json:"isActive"`
+	NeedsPasswordChange bool      `json:"needsPasswordChange"`
+}
+
+type CreateUserRequest struct {
+	Name              string `json:"name" validate:"required,min=2"`
+	Email             string `json:"email" validate:"required,email"`
+	Role              string `json:"role" validate:"required,oneof=admin manager user"`
+	TemporaryPassword string `json:"temporaryPassword" validate:"required,min=8"`
+}
+
+type SetNewPasswordRequest struct {
+	NewPassword string `json:"newPassword" validate:"required,min=8"`
+}
+
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"currentPassword" validate:"required"`
+	NewPassword     string `json:"newPassword" validate:"required,min=8"`
 }

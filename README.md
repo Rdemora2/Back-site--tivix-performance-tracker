@@ -9,6 +9,31 @@ Backend em Go com Fiber para o sistema de avaliação de performance da Tivix.
 - **PostgreSQL** - Banco de dados relacional
 - **UUID** - Identificadores únicos
 - **CORS** - Cross-Origin Resource Sharing
+- **JWT** - Autenticação baseada em tokens
+- **bcrypt** - Hash seguro de senhas
+- **SQLx** - Driver SQL extendido para Go
+
+## 🔐 Sistema de Autenticação
+
+O sistema inclui autenticação completa baseada em JWT com três níveis de permissão:
+
+- **Admin**: Acesso completo (CRUD em todos os recursos)
+- **Manager**: Pode criar/editar desenvolvedores, times e relatórios
+- **User**: Apenas visualização
+
+### Inicialização do Sistema
+
+1. **Verificar se o sistema foi inicializado**: `GET /api/v1/init/check`
+2. **Criar primeiro usuário admin**: `POST /api/v1/init/admin` (requer chave de instalação)
+
+### Endpoints de Autenticação
+
+- `POST /api/v1/auth/register` - Cadastro de usuário
+- `POST /api/v1/auth/login` - Login
+- `GET /api/v1/auth/profile` - Perfil do usuário (protegido)
+- `POST /api/v1/auth/refresh` - Renovar token (protegido)
+
+📖 **Documentação completa de integração**: Ver `FRONTEND_INTEGRATION.md`
 
 ## 📋 Pré-requisitos
 
