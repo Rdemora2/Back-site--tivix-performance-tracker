@@ -17,16 +17,16 @@ import (
 func GetAllDevelopers(c *fiber.Ctx) error {
 	// Verificar se deve incluir arquivados
 	includeArchived := c.Query("includeArchived", "false")
-	
+
 	query := `
 		SELECT id, name, role, latest_performance_score, team_id, archived_at, created_at, updated_at 
 		FROM developers 
 	`
-	
+
 	if includeArchived != "true" {
 		query += " WHERE archived_at IS NULL"
 	}
-	
+
 	query += " ORDER BY created_at DESC"
 
 	rows, err := database.DB.Query(query)
@@ -446,17 +446,17 @@ func GetDevelopersByTeam(c *fiber.Ctx) error {
 
 	// Verificar se deve incluir arquivados
 	includeArchived := c.Query("includeArchived", "false")
-	
+
 	query := `
 		SELECT id, name, role, latest_performance_score, team_id, archived_at, created_at, updated_at 
 		FROM developers 
 		WHERE team_id = $1
 	`
-	
+
 	if includeArchived != "true" {
 		query += " AND archived_at IS NULL"
 	}
-	
+
 	query += " ORDER BY created_at DESC"
 
 	rows, err := database.DB.Query(query, teamUUID)
@@ -492,5 +492,105 @@ func GetDevelopersByTeam(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"success": true,
 		"data":    developers,
+	})
+}
+
+func DeleteDeveloper(c *fiber.Ctx) error {
+	id := c.Params("id")
+	developerUUID, err := uuid.Parse(id)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{
+			"error":   true,
+			"message": "ID inválido",
+		})
+	}
+
+	var existingDeveloper models.Developer
+	checkQuery := `
+		SELECT id, name, role, latest_performance_score, team_id, archived_at, created_at, updated_at 
+		FROM developers 
+		WHERE id = $1
+	`
+
+	err = database.DB.QueryRow(checkQuery, developerUUID).Scan(
+		&existingDeveloper.ID,
+		&existingDeveloper.Name,
+		&existingDeveloper.Role,
+		&existingDeveloper.LatestPerformanceScore,
+		&existingDeveloper.TeamID,
+		&existingDeveloper.ArchivedAt,
+		&existingDeveloper.CreatedAt,
+		&existingDeveloper.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return c.Status(404).JSON(fiber.Map{
+			"error":   true,
+			"message": "Desenvolvedor não encontrado",
+		})
+	}
+	if err != nil {
+		log.Printf("Error checking developer existence: %v", err)
+		return c.Status(500).JSON(fiber.Map{
+			"error":   true,
+			"message": "Erro ao verificar desenvolvedor",
+		})
+	}
+
+	// Inicia uma transação para garantir consistência
+	tx, err := database.DB.Begin()
+	if err != nil {
+		log.Printf("Error starting transaction: %v", err)
+		return c.Status(500).JSON(fiber.Map{
+			"error":   true,
+			"message": "Erro interno do servidor",
+		})
+	}
+	defer tx.Rollback()
+
+	// Primeiro, exclui todos os relatórios de performance do desenvolvedor
+	_, err = tx.Exec("DELETE FROM performance_reports WHERE developer_id = $1", developerUUID)
+	if err != nil {
+		log.Printf("Error deleting performance reports: %v", err)
+		return c.Status(500).JSON(fiber.Map{
+			"error":   true,
+			"message": "Erro ao excluir relatórios de performance",
+		})
+	}
+
+	// Agora exclui o desenvolvedor
+	result, err := tx.Exec("DELETE FROM developers WHERE id = $1", developerUUID)
+	if err != nil {
+		log.Printf("Error deleting developer: %v", err)
+		return c.Status(500).JSON(fiber.Map{
+			"error":   true,
+			"message": "Erro ao excluir desenvolvedor",
+		})
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return c.Status(404).JSON(fiber.Map{
+			"error":   true,
+			"message": "Desenvolvedor não encontrado",
+		})
+	}
+
+	// Confirma a transação
+	err = tx.Commit()
+	if err != nil {
+		log.Printf("Error committing transaction: %v", err)
+		return c.Status(500).JSON(fiber.Map{
+			"error":   true,
+			"message": "Erro ao confirmar exclusão",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Desenvolvedor excluído com sucesso",
+		"data": fiber.Map{
+			"deletedDeveloper": existingDeveloper,
+		},
 	})
 }

@@ -50,6 +50,7 @@ func SetupRoutes(app *fiber.App) {
 	developers.Post("/", middleware.ManagerOrAdminMiddleware(), handlers.CreateDeveloper)
 	developers.Put("/:id", middleware.ManagerOrAdminMiddleware(), handlers.UpdateDeveloper)
 	developers.Put("/:id/archive", middleware.ManagerOrAdminMiddleware(), handlers.ArchiveDeveloper)
+	developers.Delete("/:id", middleware.AdminOnlyMiddleware(), handlers.DeleteDeveloper)
 
 	// Rotas de desenvolvedores por time - protegidas
 	teams.Get("/:teamId/developers", handlers.GetDevelopersByTeam)
