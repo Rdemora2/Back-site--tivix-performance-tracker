@@ -11,9 +11,7 @@ import (
 	"tivix-performance-tracker-backend/models"
 )
 
-// CreateAdminUser cria o primeiro usuário administrador (apenas se não houver usuários no sistema)
 func CreateAdminUser(c *fiber.Ctx) error {
-	// Verificar se já existem usuários no sistema
 	var userCount int
 	err := database.DB.Get(&userCount, "SELECT COUNT(*) FROM users")
 	if err != nil {
@@ -30,7 +28,6 @@ func CreateAdminUser(c *fiber.Ctx) error {
 		})
 	}
 
-	// Verificar se a chave de instalação está correta
 	type InitRequest struct {
 		InstallKey string `json:"installKey"`
 		Email      string `json:"email" validate:"required,email"`
@@ -45,8 +42,6 @@ func CreateAdminUser(c *fiber.Ctx) error {
 			"message": "Dados inválidos",
 		})
 	}
-
-	// Validar chave de instalação
 	expectedKey := os.Getenv("INSTALL_KEY")
 	if expectedKey == "" {
 		expectedKey = "TIVIX_INSTALL_2024"
@@ -59,7 +54,6 @@ func CreateAdminUser(c *fiber.Ctx) error {
 		})
 	}
 
-	// Validar dados
 	if err := validate.Struct(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error":   true,
@@ -68,7 +62,6 @@ func CreateAdminUser(c *fiber.Ctx) error {
 		})
 	}
 
-	// Criar usuário admin
 	user := models.User{
 		ID:        uuid.New(),
 		Email:     req.Email,
@@ -79,7 +72,6 @@ func CreateAdminUser(c *fiber.Ctx) error {
 		UpdatedAt: time.Now(),
 	}
 
-	// Hash da senha
 	if err := user.HashPassword(req.Password); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error":   true,
@@ -88,10 +80,10 @@ func CreateAdminUser(c *fiber.Ctx) error {
 	}
 
 	query := `
-		INSERT INTO users (id, email, password, name, role, is_active, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO users (id, email, password, name, role, company_id, is_active, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`
-	_, err = database.DB.Exec(query, user.ID, user.Email, user.Password, user.Name, user.Role, user.IsActive, user.CreatedAt, user.UpdatedAt)
+	_, err = database.DB.Exec(query, user.ID, user.Email, user.Password, user.Name, user.Role, user.CompanyID, user.IsActive, user.CreatedAt, user.UpdatedAt)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error":   true,
@@ -111,7 +103,6 @@ func CreateAdminUser(c *fiber.Ctx) error {
 	})
 }
 
-// CheckInitialization verifica se o sistema já foi inicializado
 func CheckInitialization(c *fiber.Ctx) error {
 	var userCount int
 	err := database.DB.Get(&userCount, "SELECT COUNT(*) FROM users")

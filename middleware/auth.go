@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"errors"
-	"os"
+	"fmt"
 	"strings"
 	"time"
 
@@ -10,49 +10,49 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 
+	"tivix-performance-tracker-backend/config"
 	"tivix-performance-tracker-backend/models"
 )
 
 type JWTClaims struct {
-	UserID              uuid.UUID `json:"userId"`
-	Email               string    `json:"email"`
-	Role                string    `json:"role"`
-	IsActive            bool      `json:"isActive"`
-	NeedsPasswordChange bool      `json:"needsPasswordChange"`
+	UserID              uuid.UUID  `json:"userId"`
+	Email               string     `json:"email"`
+	Role                string     `json:"role"`
+	CompanyID           *uuid.UUID `json:"companyId"`
+	IsActive            bool       `json:"isActive"`
+	NeedsPasswordChange bool       `json:"needsPasswordChange"`
 	jwt.RegisteredClaims
 }
 
 func GenerateJWT(user models.User) (string, error) {
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		jwtSecret = "your-secret-key-change-this-in-production"
-	}
+	cfg := config.LoadConfig()
 
 	claims := JWTClaims{
 		UserID:              user.ID,
 		Email:               user.Email,
 		Role:                user.Role,
+		CompanyID:           user.CompanyID,
 		IsActive:            user.IsActive,
 		NeedsPasswordChange: user.NeedsPasswordChange,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)), // Token expira em 24 horas
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)), // Reduzido para 15 minutos
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			Issuer:    "tivix-performance-tracker",
 		},
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(jwtSecret))
+	return token.SignedString([]byte(cfg.JWTSecret))
 }
 
 func ValidateJWT(tokenString string) (*JWTClaims, error) {
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		jwtSecret = "your-secret-key-change-this-in-production"
-	}
+	cfg := config.LoadConfig()
 
 	token, err := jwt.ParseWithClaims(tokenString, &JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
-		return []byte(jwtSecret), nil
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(cfg.JWTSecret), nil
 	})
 
 	if err != nil {
@@ -154,6 +154,25 @@ func CheckPasswordChangeMiddleware() fiber.Handler {
 				"status":                 "error",
 				"message":                "Você deve definir uma nova senha antes de continuar",
 				"requiresPasswordChange": true,
+			})
+		}
+
+		return c.Next()
+	}
+}
+
+func CompanyAccessMiddleware() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		user := c.Locals("user").(*JWTClaims)
+
+		if user.Role == "admin" {
+			return c.Next()
+		}
+
+		if user.CompanyID == nil {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"status":  "error",
+				"message": "Usuário deve estar associado a uma empresa",
 			})
 		}
 

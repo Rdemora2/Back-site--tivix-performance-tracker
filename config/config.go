@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log"
 	"os"
 )
 
@@ -29,7 +30,7 @@ func LoadConfig() *Config {
 		Port:        getEnv("PORT", "8080"),
 		Host:        getEnv("HOST", "localhost"),
 		Environment: getEnv("ENVIRONMENT", "development"),
-		JWTSecret:   getEnv("JWT_SECRET", "default-secret-change-in-production"),
+		JWTSecret:   getRequiredEnv("JWT_SECRET"),
 		CORSOrigin:  getEnv("CORS_ORIGIN", "http://localhost:5173"),
 	}
 }
@@ -39,4 +40,15 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+func getRequiredEnv(key string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		log.Fatalf("Required environment variable %s is not set", key)
+	}
+	if len(value) < 32 {
+		log.Fatalf("Environment variable %s must be at least 32 characters long for security", key)
+	}
+	return value
 }
