@@ -26,7 +26,7 @@ services:
       - api-performancetracker
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.api-performancetracker.rule=Host(`api.performancetracker.tivix.com.br`)"
+      - "traefik.http.routers.api-performancetracker.rule=Host(`apiperformancetracker.tivix.com.br`)"
       - "traefik.http.routers.api-performancetracker.entrypoints=websecure"
       - "traefik.http.routers.api-performancetracker.tls.certresolver=myresolver"
       - "traefik.http.services.api-performancetracker.loadbalancer.server.port=80"
