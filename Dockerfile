@@ -21,6 +21,9 @@ COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 USER nonroot:nonroot
 
 COPY --from=builder --chown=nonroot:nonroot /app/main /app/main
+COPY --from=builder --chown=nonroot:nonroot /app/migrations /app/migrations
+
+WORKDIR /app
 
 EXPOSE 8080
 
