@@ -83,6 +83,15 @@ func main() {
 
 	log.Printf("🔧 CORS Origins permitidas: %v", finalOrigins)
 
+	app.Use(cors.New(cors.Config{
+		AllowOrigins:     strings.Join(finalOrigins, ","),
+		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS,PATCH",
+		AllowHeaders:     "Origin,Content-Type,Accept,Authorization,X-Requested-With",
+		AllowCredentials: true,
+		ExposeHeaders:    "Content-Length",
+		MaxAge:           86400, // 24 hours
+	}))
+
 	app.Use(logger.New())
 
 	app.Use(middleware.InputSizeLimit(10 * 1024 * 1024))
@@ -113,15 +122,6 @@ func main() {
 				"message": "Muitas tentativas de login. Tente novamente em 15 minutos.",
 			})
 		},
-	}))
-
-	app.Use(cors.New(cors.Config{
-		AllowOrigins:     strings.Join(finalOrigins, ","),
-		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS,PATCH",
-		AllowHeaders:     "Origin,Content-Type,Accept,Authorization,X-Requested-With",
-		AllowCredentials: true,
-		ExposeHeaders:    "Content-Length",
-		MaxAge:           86400, // 24 hours
 	}))
 
 	routes.SetupRoutes(app)
