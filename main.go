@@ -81,6 +81,8 @@ func main() {
 		}
 	}
 
+	log.Printf("🔧 CORS Origins permitidas: %v", finalOrigins)
+
 	app.Use(logger.New())
 
 	app.Use(middleware.InputSizeLimit(10 * 1024 * 1024))
@@ -115,9 +117,11 @@ func main() {
 
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     strings.Join(finalOrigins, ","),
-		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
-		AllowHeaders:     "Origin,Content-Type,Accept,Authorization",
+		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS,PATCH",
+		AllowHeaders:     "Origin,Content-Type,Accept,Authorization,X-Requested-With",
 		AllowCredentials: true,
+		ExposeHeaders:    "Content-Length",
+		MaxAge:           86400, // 24 hours
 	}))
 
 	routes.SetupRoutes(app)
