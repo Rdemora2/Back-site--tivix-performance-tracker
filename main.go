@@ -86,11 +86,26 @@ func main() {
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     strings.Join(finalOrigins, ","),
 		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS,PATCH",
-		AllowHeaders:     "Origin,Content-Type,Accept,Authorization,X-Requested-With",
+		AllowHeaders:     "Origin,Content-Type,Accept,Authorization,X-Requested-With,X-CSRF-Token",
 		AllowCredentials: true,
-		ExposeHeaders:    "Content-Length",
-		MaxAge:           86400, // 24 hours
+		ExposeHeaders:    "Content-Length,Content-Range",
+		MaxAge:           86400,
 	}))
+
+	app.Options("/*", func(c *fiber.Ctx) error {
+		origin := c.Get("Origin")
+		for _, allowedOrigin := range finalOrigins {
+			if origin == allowedOrigin {
+				c.Set("Access-Control-Allow-Origin", origin)
+				c.Set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS,PATCH")
+				c.Set("Access-Control-Allow-Headers", "Origin,Content-Type,Accept,Authorization,X-Requested-With,X-CSRF-Token")
+				c.Set("Access-Control-Allow-Credentials", "true")
+				c.Set("Access-Control-Max-Age", "86400")
+				break
+			}
+		}
+		return c.SendStatus(fiber.StatusOK)
+	})
 
 	app.Use(logger.New())
 
